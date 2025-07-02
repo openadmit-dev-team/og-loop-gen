@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "type": "module",
   "dependencies": {
-    "@vercel/og": "0.7.1",
+    "@vercel/og": "latest",
     "react": "^18.2.0"
   }
 }
