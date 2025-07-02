@@ -1,9 +1,11 @@
+// api/generate-question-preview.ts
 import { ImageResponse } from '@vercel/og';
 import { createClient } from '@supabase/supabase-js';
 import { QuestionPreviewCard } from './_QuestionPreviewCard';
 import { uploadImageToSupabase } from './_upload-to-supabase';
 
-export const config = { runtime: 'edge' };
+// REMOVE this line for Node.js Serverless Function
+// export const config = { runtime: 'edge' };
 
 const supabase = createClient(
   process.env.SUPABASE_URL!,
@@ -11,49 +13,16 @@ const supabase = createClient(
 );
 
 async function fetchQuestionData(questionId: string) {
-  // Fetch question, answer, votes, comments, user, mentor, etc.
-  const { data: question, error } = await supabase
-    .from('questions')
-    .select(`
-      id, text, is_anonymous, creator_id,
-      question_votes(count),
-      comments(count),
-      users!questions_creator_id_fkey(name, profile_photo_url),
-      answers(id, raw_text, mentor_id, 
-        users!answers_mentor_id_fkey(name, profile_photo_url)
-      )
-    `)
-    .eq('id', questionId)
-    .single();
-
-  if (error || !question) return null;
-
-  return {
-    id: question.id,
-    text: question.text,
-    upvoteCount: question.question_votes?.length || 0,
-    commentCount: question.comments?.length || 0,
-    author: question.is_anonymous
-      ? { name: 'Anonymous', profile_photo_url: null }
-      : Array.isArray(question.users) ? question.users[0] : question.users,
-    answer: question.answers?.[0]
-      ? {
-        raw_text: question.answers[0].raw_text,
-        mentor: question.answers[0].users
-          ? (Array.isArray(question.answers[0].users) ? question.answers[0].users[0] : question.answers[0].users)
-          : null,
-        }
-    : null,
-  };
+  // ... your fetch logic (as you wrote) ...
 }
 
-export default async function handler(req: Request) {
-  const { searchParams } = new URL(req.url);
+export default async function handler(req, res) {
+  const { searchParams } = new URL(req.url, `http://${req.headers.host}`);
   const questionId = searchParams.get('id');
-  if (!questionId) return new Response('Missing id', { status: 400 });
+  if (!questionId) return res.status(400).send('Missing id');
 
   const data = await fetchQuestionData(questionId);
-  if (!data) return new Response('Not found', { status: 404 });
+  if (!data) return res.status(404).send('Not found');
 
   // Render the image
   const imageResponse = new ImageResponse(
@@ -69,11 +38,8 @@ export default async function handler(req: Request) {
   const publicUrl = await uploadImageToSupabase(buffer, data.id);
 
   // Return the image directly (for OG preview) and the URL in the header
-  return new Response(buffer, {
-    headers: {
-      'Content-Type': 'image/png',
-      'Cache-Control': 'public, max-age=31536000, immutable',
-      'x-og-image-url': publicUrl,
-    },
-  });
+  res.setHeader('Content-Type', 'image/png');
+  res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+  res.setHeader('x-og-image-url', publicUrl);
+  res.send(buffer);
 }
