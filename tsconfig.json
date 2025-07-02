@@ -14,5 +14,5 @@
     "forceConsistentCasingInFileNames": true,
     "strict": false
   },
-  "include": ["api"]
+  "include": ["api", "env.d.ts"]
 }
