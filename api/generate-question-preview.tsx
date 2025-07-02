@@ -18,7 +18,9 @@ async function fetchQuestionData(questionId: string) {
     }
   );
   const question = await questionRes.json();
-  if (!question || !question[0]) return null;
+  // @ts-ignore
+  console.log('Fetched question:', question);
+  if (!question || !question[0]) return undefined;
   const q = question[0];
 
   // Fetch upvotes count
@@ -49,7 +51,7 @@ async function fetchQuestionData(questionId: string) {
   }
 
   // Fetch answer (if any)
-  let answer = null;
+  let answer: { raw_text: string; mentor: { name: string; profile_photo_url: string | null } | null } | undefined = undefined;
   if (q.is_answered) {
     const answerRes = await fetch(
       `${supabaseUrl}/rest/v1/answers?question_id=eq.${questionId}&select=raw_text,mentor_id`,
@@ -112,11 +114,11 @@ function QuestionPreviewCard({
     >
       {/* Branding */}
       <div style={{ display: 'flex', alignItems: 'center', marginBottom: 32 }}>
-        <img src="https://yourdomain.com/logo.png" width={60} height={60} style={{ borderRadius: 16, marginRight: 24 }} />
+        <img src="https://placehold.co/60x60.png" width={60} height={60} style={{ borderRadius: 16, marginRight: 24 }} />
         <span style={{ fontWeight: 800, fontSize: 40, color: '#2E3AEF', letterSpacing: 1 }}>Loop</span>
       </div>
       {/* Question */}
-      <div style={{ flex: 1 }}>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
         <div style={{ fontSize: 32, fontWeight: 700, color: '#1E1F4A', marginBottom: 24 }}>{text}</div>
         <div style={{ display: 'flex', alignItems: 'center', marginBottom: 24 }}>
           {/* Author */}
@@ -153,6 +155,7 @@ function QuestionPreviewCard({
             padding: 32,
             boxShadow: '0 4px 24px rgba(46,58,239,0.08)',
             marginTop: 16,
+            display: 'flex', flexDirection: 'column',
           }}>
             <div style={{ display: 'flex', alignItems: 'center', marginBottom: 16 }}>
               {answer.mentor.profile_photo_url ? (
@@ -174,7 +177,7 @@ function QuestionPreviewCard({
         )}
       </div>
       {/* Footer */}
-      <div style={{ textAlign: 'right', fontSize: 18, color: '#888', marginTop: 32 }}>
+      <div style={{ textAlign: 'right', fontSize: 18, color: '#888', marginTop: 32, display: 'flex', justifyContent: 'flex-end' }}>
         loopmobile.app
       </div>
     </div>
@@ -184,14 +187,24 @@ function QuestionPreviewCard({
 export default async function handler(req: Request) {
   const { searchParams } = new URL(req.url);
   const questionId = searchParams.get('id');
-  if (!questionId) return new Response('Missing id', { status: 400 });
+  if (!questionId) {
+    return new ImageResponse(
+      <div style={{
+        width: 1200, height: 630, display: 'flex', alignItems: 'center', justifyContent: 'center',
+        fontSize: 48, color: 'red', background: '#fff',
+      }}>
+        Missing id
+      </div>,
+      { width: 1200, height: 630 }
+    );
+  }
 
   const data = await fetchQuestionData(questionId);
   if (!data) {
     return new ImageResponse(
       <div style={{
         width: 1200, height: 630, display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontSize: 48, color: 'red', background: '#fff'
+        fontSize: 48, color: 'red', background: '#fff',
       }}>
         No data found
       </div>,
@@ -200,7 +213,6 @@ export default async function handler(req: Request) {
   }
 
   return new ImageResponse(
-    <QuestionPreviewCard {...data} />,
-    { width: 1200, height: 630 }
+    <QuestionPreviewCard {...data} />, { width: 1200, height: 630 }
   );
 }
