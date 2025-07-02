@@ -3,7 +3,6 @@
   "version": "1.0.0",
   "type": "module",
   "dependencies": {
-    "@vercel/og": "^0.8.1",
-    "@supabase/supabase-js": "^2.39.7"
+    "@vercel/og": "^0.8.1"
   }
 }
