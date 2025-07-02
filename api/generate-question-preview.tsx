@@ -35,18 +35,15 @@ async function fetchQuestionData(questionId: string) {
     commentCount: question.comments?.length || 0,
     author: question.is_anonymous
       ? { name: 'Anonymous', profile_photo_url: null }
-      : question.users,
+      : Array.isArray(question.users) ? question.users[0] : question.users,
     answer: question.answers?.[0]
       ? {
-          raw_text: question.answers[0].raw_text,
-          mentor: question.answers[0].users
-            ? {
-                name: question.answers[0].users.name,
-                profile_photo_url: question.answers[0].users.profile_photo_url,
-              }
-            : null,
+        raw_text: question.answers[0].raw_text,
+        mentor: question.answers[0].users
+          ? (Array.isArray(question.answers[0].users) ? question.answers[0].users[0] : question.answers[0].users)
+          : null,
         }
-      : null,
+    : null,
   };
 }
 
