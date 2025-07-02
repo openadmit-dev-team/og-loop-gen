@@ -1,5 +1,4 @@
 import { ImageResponse } from '@vercel/og';
-import { QuestionPreviewCard } from './_QuestionPreviewCard';
 
 export const config = { runtime: 'edge' };
 
@@ -8,18 +7,17 @@ async function fetchQuestionData(questionId: string) {
   const supabaseUrl = process.env.SUPABASE_URL!;
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
-  // Fetch question, votes, comments, user, answer, mentor
-  // You may need to adjust the query params to match your schema
-  const { data: question, error } = await (await fetch(
-    `${supabaseUrl}/rest/v1/questions?id=eq.${questionId}&select=id,text,is_anonymous,creator_id,preview_image_url`,
+  // Fetch question
+  const questionRes = await fetch(
+    `${supabaseUrl}/rest/v1/questions?id=eq.${questionId}&select=id,text,is_anonymous,creator_id`,
     {
       headers: {
         apikey: serviceKey,
         Authorization: `Bearer ${serviceKey}`,
       },
     }
-  )).json();
-
+  );
+  const question = await questionRes.json();
   if (!question || !question[0]) return null;
   const q = question[0];
 
@@ -52,7 +50,7 @@ async function fetchQuestionData(questionId: string) {
 
   // Fetch answer (if any)
   const answerRes = await fetch(
-    `${supabaseUrl}/rest/v1/answers?question_id=eq.${questionId}&select=id,raw_text,mentor_id`,
+    `${supabaseUrl}/rest/v1/answers?question_id=eq.${questionId}&select=raw_text,mentor_id`,
     { headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` } }
   );
   const answers = await answerRes.json();
@@ -73,7 +71,6 @@ async function fetchQuestionData(questionId: string) {
   }
 
   return {
-    id: q.id,
     text: q.text,
     upvoteCount: upvotes.length,
     commentCount: comments.length,
@@ -82,46 +79,97 @@ async function fetchQuestionData(questionId: string) {
   };
 }
 
-// Helper to upload to Supabase Storage via REST API
-async function uploadToSupabase(imageBuffer: ArrayBuffer, questionId: string) {
-  const supabaseUrl = process.env.SUPABASE_URL!;
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-  const bucket = process.env.SUPABASE_STORAGE_BUCKET!;
-
-  // Upload image
-  const uploadRes = await fetch(
-    `${supabaseUrl}/storage/v1/object/${bucket}/previews/${questionId}.png`,
-    {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${serviceKey}`,
-        'Content-Type': 'image/png',
-        'x-upsert': 'true',
-      },
-      body: imageBuffer,
-    }
+// Inline JSX card
+function QuestionPreviewCard({
+  text,
+  upvoteCount,
+  commentCount,
+  author,
+  answer,
+}: {
+  text: string;
+  upvoteCount: number;
+  commentCount: number;
+  author: { name: string; profile_photo_url: string | null };
+  answer?: { raw_text: string; mentor: { name: string; profile_photo_url: string | null } | null };
+}) {
+  return (
+    <div
+      style={{
+        width: '100%',
+        height: '100%',
+        background: 'linear-gradient(135deg, #e7ebff 0%, #f7f8fa 100%)',
+        borderRadius: 32,
+        padding: 48,
+        fontFamily: 'Inter, sans-serif',
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'space-between',
+        boxSizing: 'border-box',
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', marginBottom: 32 }}>
+        <img src="https://yourdomain.com/logo.png" width={60} height={60} style={{ borderRadius: 16, marginRight: 24 }} />
+        <span style={{ fontWeight: 800, fontSize: 40, color: '#2E3AEF', letterSpacing: 1 }}>Loop</span>
+      </div>
+      <div style={{ flex: 1 }}>
+        <div style={{ fontSize: 32, fontWeight: 700, color: '#1E1F4A', marginBottom: 24 }}>{text}</div>
+        <div style={{ display: 'flex', alignItems: 'center', marginBottom: 24 }}>
+          <div style={{ display: 'flex', alignItems: 'center', marginRight: 32 }}>
+            {author?.profile_photo_url ? (
+              <img src={author.profile_photo_url} width={48} height={48} style={{ borderRadius: 24, marginRight: 12 }} />
+            ) : (
+              <div style={{
+                width: 48, height: 48, borderRadius: 24, background: '#e7ebff',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', marginRight: 12,
+                fontWeight: 700, fontSize: 24, color: '#2E3AEF'
+              }}>
+                {author?.name?.[0] || 'A'}
+              </div>
+            )}
+            <span style={{ fontWeight: 600, fontSize: 20, color: '#333' }}>{author?.name}</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', marginRight: 24 }}>
+            <svg width="24" height="24" fill="#2E3AEF" viewBox="0 0 24 24"><path d="M12 4l6 8h-4v8h-4v-8H6z"/></svg>
+            <span style={{ fontWeight: 700, fontSize: 20, color: '#2E3AEF', marginLeft: 6 }}>{upvoteCount}</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center' }}>
+            <svg width="24" height="24" fill="#2E3AEF" viewBox="0 0 24 24"><path d="M21 6h-2V5a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2v1H3a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h6l3 3 3-3h6a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2z"/></svg>
+            <span style={{ fontWeight: 700, fontSize: 20, color: '#2E3AEF', marginLeft: 6 }}>{commentCount}</span>
+          </div>
+        </div>
+        {answer && answer.mentor && (
+          <div style={{
+            background: '#fff',
+            borderRadius: 20,
+            padding: 32,
+            boxShadow: '0 4px 24px rgba(46,58,239,0.08)',
+            marginTop: 16,
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', marginBottom: 16 }}>
+              {answer.mentor.profile_photo_url ? (
+                <img src={answer.mentor.profile_photo_url} width={40} height={40} style={{ borderRadius: 20, marginRight: 12 }} />
+              ) : (
+                <div style={{
+                  width: 40, height: 40, borderRadius: 20, background: '#e7ebff',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', marginRight: 12,
+                  fontWeight: 700, fontSize: 20, color: '#2E3AEF'
+                }}>
+                  {answer.mentor.name?.[0] || 'M'}
+                </div>
+              )}
+              <span style={{ fontWeight: 700, fontSize: 18, color: '#2E3AEF' }}>{answer.mentor.name}</span>
+              <span style={{ fontWeight: 400, fontSize: 16, color: '#888', marginLeft: 10 }}>Mentor</span>
+            </div>
+            <div style={{ fontSize: 22, color: '#222', fontWeight: 500, lineHeight: 1.4 }}>{answer.raw_text}</div>
+          </div>
+        )}
+      </div>
+      <div style={{ textAlign: 'right', fontSize: 18, color: '#888', marginTop: 32 }}>
+        loopmobile.app
+      </div>
+    </div>
   );
-  if (!uploadRes.ok) throw new Error('Failed to upload image to Supabase Storage');
-
-  // Public URL
-  const publicUrl = `${supabaseUrl}/storage/v1/object/public/${bucket}/previews/${questionId}.png`;
-
-  // Update DB
-  await fetch(
-    `${supabaseUrl}/rest/v1/questions?id=eq.${questionId}`,
-    {
-      method: 'PATCH',
-      headers: {
-        apikey: serviceKey,
-        Authorization: `Bearer ${serviceKey}`,
-        'Content-Type': 'application/json',
-        Prefer: 'return=minimal',
-      },
-      body: JSON.stringify({ preview_image_url: publicUrl }),
-    }
-  );
-
-  return publicUrl;
 }
 
 export default async function handler(req: Request) {
@@ -132,20 +180,8 @@ export default async function handler(req: Request) {
   const data = await fetchQuestionData(questionId);
   if (!data) return new Response('Not found', { status: 404 });
 
-  const imageResponse = new ImageResponse(
+  return new ImageResponse(
     <QuestionPreviewCard {...data} />,
     { width: 1200, height: 630 }
   );
-  const arrayBuffer = await imageResponse.arrayBuffer();
-
-  // Upload to Supabase Storage
-  const publicUrl = await uploadToSupabase(arrayBuffer, questionId);
-
-  return new Response(arrayBuffer, {
-    headers: {
-      'Content-Type': 'image/png',
-      'Cache-Control': 'public, max-age=31536000, immutable',
-      'x-og-image-url': publicUrl,
-    },
-  });
 }
